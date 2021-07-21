@@ -23,7 +23,7 @@ declare -x FIND="find" #set to gfind to use homebrew's GNU findutils on OSX Yose
 declare -x SED="sed"
 declare -x DIR=""
 declare -x RM="rm"
-declare -rx UNRARALL_VERSION="0.5.0"
+declare -rx UNRARALL_VERSION="0.5.1"
 declare -ix FORCE=0
 declare -ix VERBOSE=0
 declare -ix QUIET=0
@@ -400,6 +400,64 @@ function unrarall_clean_covers_folders()
     clean)
       [ "$VERBOSE" -eq 1 ] && message info "Removing all Covers/ folders"
       find_wrapper . -depth -type d -iname 'covers' -exec ${RM} -rf $( [ $VERBOSE -eq 1 ] && echo '-v') '{}' \;
+    ;;
+    *)
+      message error "Could not execute covers_folders hook"
+    ;;
+  esac
+}
+
+function unrarall_clean_rename()
+{
+  case "$1" in
+    help)
+      echo "rename files to Folder name ( for proper names with scene rls\b"
+      echo " !!! you get in trouble if the archive contains multiple episodes !!!\b"
+    ;;
+    clean)
+      [ "$VERBOSE" -eq 1 ] && message info "rename Movie files - $PWD"
+      for file in `find . -iname "*.mkv" -o -iname "*.avi" -o -iname "*.mp4" -o -iname "*.ts"`; do
+	# Code shamly ripped of nzbget ... but i know that works fine for scene rls 
+	# !!! you get in trouble if the archive contains multiple episodes !!!
+	# check if mkv is bigger than 200 MB; size is kilobytes
+	minimumsize=200000
+	actualsize=$(du -k "$file" | cut -f 1)
+	if [ $actualsize -ge $minimumsize ]; then
+    	# size is over the minimum size, so rename mkv
+
+		# create the new name to be same as nzb name
+
+		# https://nzbget.net/post-processing-scripts
+		nzbname="$PWD"
+
+		filename="$(basename "$file")"
+		extension="${filename##*.}"
+		
+		# remove extention from filename to compare to nzb name
+		filename="${filename%.*}"
+		
+		# desired new name
+		newname="$nzbname.$extension"
+
+		# if file name is nzb name already, then exit
+		if [ "$nzbname" = "$filename" ]; then
+			echo "[INFO] File name is already the same as the NZB name."
+			exit $POSTPROCESS_SUCCESS
+		fi
+
+		# try to rename file
+		if mv -v "$file" "$newname"; then
+			echo "[INFO] Success!"
+		else
+			echo "[ERROR] Could not rename "$file" to "$newname""
+			exit $POSTPROCESS_ERROR
+		fi
+	else
+		# file too small
+		echo "[INFO] "$file" is under 200 MB: $actualsize"
+	fi
+done
+
     ;;
     *)
       message error "Could not execute covers_folders hook"
